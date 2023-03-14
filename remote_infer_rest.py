@@ -7,6 +7,7 @@ import torchvision
 import argparse
 import requests
 import time
+import yaml
 
 class ort_v5:
     def __init__(self, img_path, infer_url, conf_thres, iou_thres, img_size, classes):
@@ -20,11 +21,10 @@ class ort_v5:
 
     def __call__(self):
         """
-        Makes an prediction on a givent image by calling an inference endpoint served by ModelMesh.
+        Makes an prediction on a given image by calling an inference endpoint served by ModelMesh.
         
         The model is based on YoloV5 (https://github.com/ultralytics/yolov5), exported as ONNX, and served
         using OpenVino Model Server.
-        Image is written to a file.
         """
         start_time = time.time()
         # image preprocessing
@@ -37,7 +37,7 @@ class ort_v5:
         im /= 255 # Convert RGB values [0-255] to [0-1]
         
         # json payload
-        im_json = im.tolist() # Converts the array to a nestes list
+        im_json = im.tolist() # Converts the array to a nested list
         # ModelMesh expected input format
         # (get model input "name" and "shape" from your model)
         data = {
@@ -61,20 +61,18 @@ class ort_v5:
         names= self.class_name()
         raw_output = response.json() # Extract to Json
         arr = np.array(raw_output['outputs'][0]['data']) # Get the response data as a NumPy Array
-        output = torch.from_numpy(arr) # Create a tensor from array
+        output = torch.tensor(arr) # Create a tensor from array
         prediction_columns_number = 5 + len(self.names_array) # Model returns model returns [xywh, conf, class0, class1, ...]
         output = output.reshape(1, int(int(output.shape[0])/prediction_columns_number), prediction_columns_number) # Reshape the flat array prediction
         out = self.non_max_suppression(output, self.conf_thres, self.iou_thres)[0] # Run NMS to remove overlapping boxes
-        #print('Predictions format: each detection is a float64 array shaped as [top_left_corner_x, top_left_corner_y, bottom_right_corner_x, bottom_right_corner_y, confidence, class_index]')
-        #print('Predictions:',out) # Print result prediction tensor
-        #print('yolov5 ONNXRuntime Inference Time:', t2-t1) # Print inference time
-        #img = self.result(image_or,ratio, dwdh, out) # Draw the boxes from results
-        #cv2.imwrite('result.jpg', img) # Save image
+        img = self.result(image_or,ratio, dwdh, out) # Draw the boxes from results
+
         end_time = time.time()
         execution_time = end_time - start_time
 
         result = f"{self.img_path} processed in {execution_time:.2f} seconds, inference time {inference_time:.2f} seconds"
-        print(result)
+        
+        return img, out, result
  
     def box_iou(self,box1, box2, eps=1e-7):
         # https://github.com/pytorch/vision/blob/master/torchvision/ops/boxes.py
@@ -223,15 +221,11 @@ class ort_v5:
         y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
         return y
 
-    # Read classes.txt 
+    # Read classes
     def class_name(self):
-        classes=[]
-        file= open(self.names,'r')
-        while True:
-          name=file.readline().strip('\n')
-          if not name:
-            break
-          classes.append(name)
+        with open(self.names, 'r') as f:
+            data = yaml.safe_load(f)
+        classes = [data['names'][i] for i in data['names']]
         return classes
 
     def letterbox(self, im, color=(114, 114, 114), auto=True, scaleup=True, stride=32):
@@ -280,17 +274,3 @@ class ort_v5:
             cv2.rectangle(img,box[:2],box[2:],color,2)
             cv2.putText(img,name,(box[0], box[1] - 2),cv2.FONT_HERSHEY_SIMPLEX,0.75,[0, 255, 0],thickness=2) 
         return img
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--image',help='Specify input image', default= '', type=str)
-    parser.add_argument('--infer_url', default='', type=str, help='inference url')
-    parser.add_argument('--conf_thres',default= 0.7, type=float, help='confidence threshold')
-    parser.add_argument('--iou_thres',type= float, default= 0.5, help='iou threshold')
-    parser.add_argument('--imgs', default=640,type= int, help='image size')
-    parser.add_argument('--classes',type=str,default='', help='class names')
-    opt= parser.parse_args()
-    print(opt)
-    ORT= ort_v5(opt.image, opt.infer_url, conf_thres= opt.conf_thres, iou_thres=opt.iou_thres, img_size=(opt.imgs,opt.imgs), classes=opt.classes)
-    ORT()
-  

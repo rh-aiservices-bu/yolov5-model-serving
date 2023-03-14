@@ -9,7 +9,6 @@ import requests
 import grpc
 import grpc_predict_v2_pb2_grpc
 import grpc_predict_v2_pb2
-import struct
 import time
 import yaml
 
@@ -73,7 +72,7 @@ class ort_v5:
 
         # Response processing
         names= self.class_name()
-        output = torch.tensor(result_arr)
+        output = torch.tensor(result_arr) # Create a tensor from array
         prediction_columns_number = 5 + len(self.names_array) # Model returns model returns [xywh, conf, class0, class1, ...]
         output = output.reshape(1, int(int(output.shape[0])/prediction_columns_number), prediction_columns_number) # Reshape the flat array prediction
         out = self.non_max_suppression(output, conf_thres, iou_thres)[0] # Run NMS to remove overlapping boxes
@@ -233,7 +232,7 @@ class ort_v5:
         y[:, 3] = x[:, 1] + x[:, 3] / 2  # bottom right y
         return y
 
-    # Read classes.txt 
+    # Read classes
     def class_name(self):
         with open(self.names, 'r') as f:
             data = yaml.safe_load(f)
