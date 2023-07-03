@@ -77,4 +77,4 @@ Here are a few elements to help you choose between the two available interfaces 
 
 - REST is easier to implement: it is a much better known protocol for most people, and involves a little bit less programming. There is no need to create a connection, instantiate objects,... So it's often easier to use.
 - If you want to query the model directly from outside OpenShift, you have to use REST which is the only one exposed. You can expose gRPC too, but it's kind of difficult right now.
-- gRPC is **wwwwwaaaayyyyy much faster** than RPC. With the exact same model serving instance, as showed in the notebooks, inferences are about 30x faster. That is huge when you have score of images to process.
+- gRPC is **wwwwwaaaayyyyy much faster** than REST. With the exact same model serving instance, as showed in the notebooks, inferences are about 30x faster. That is huge when you have score of images to process.
